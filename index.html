@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="개념맵">
+<meta name="theme-color" content="#0a0c10">
+<title>개념맵 — 나만의 과학수학 뇌지도</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c10; --surface:#111318; --surface2:#1a1d24;
+  --border:rgba(255,255,255,0.08); --accent:#4af0c4;
+  --text:#e2e8f0; --muted:#64748b;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+  --safe-left:env(safe-area-inset-left,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;height:-webkit-fill-available;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;
+  display:flex;flex-direction:column;padding-top:var(--safe-top);}
+
+/* ══ ONBOARDING ══ */
+#onboarding{position:fixed;inset:0;background:rgba(10,12,16,0.97);z-index:2000;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.ob-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:32px 28px;max-width:500px;width:100%;max-height:calc(100vh - 40px);overflow-y:auto;}
+.ob-box h1{font-size:20px;font-weight:700;margin-bottom:6px;}
+.ob-box h1 em{color:var(--accent);font-style:normal;}
+.ob-box p{color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:22px;}
+.ob-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.07em;
+  text-transform:uppercase;margin-bottom:10px;}
+.subject-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:22px;}
+.subj-chip{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:9px 12px;cursor:pointer;font-size:13px;transition:all .15s;user-select:none;}
+.subj-chip.sel{border-color:var(--accent);background:rgba(74,240,196,0.08);color:var(--accent);}
+.ob-start{width:100%;background:var(--accent);color:#0a0c10;border:none;border-radius:9px;
+  padding:13px;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;
+  cursor:pointer;transition:opacity .2s;}
+.ob-start:disabled{opacity:.3;cursor:not-allowed;}
+
+/* ══ TOP BAR ══ */
+#topBar{display:flex;align-items:center;padding:10px 14px;gap:10px;
+  background:transparent;position:absolute;top:var(--safe-top);left:0;right:0;z-index:100;
+  pointer-events:none;}
+#topBar>*{pointer-events:all;}
+.logo{font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);
+  background:rgba(10,12,16,0.7);border-radius:8px;padding:6px 10px;backdrop-filter:blur(8px);}
+.logo span{color:var(--muted);}
+.top-sep{flex:1;}
+.icon-btn{background:rgba(17,19,24,0.8);border:1px solid var(--border);
+  border-radius:10px;color:var(--muted);font-size:15px;
+  width:38px;height:38px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;backdrop-filter:blur(8px);transition:all .2s;flex-shrink:0;}
+.icon-btn:active,.icon-btn.active{border-color:var(--accent);color:var(--accent);}
+
+/* ══ MAP FULL SCREEN ══ */
+#mapWrap{position:fixed;inset:0;z-index:1;}
+canvas#mapCanvas{width:100%;height:100%;touch-action:none;}
+
+/* ══ SIDEBAR ══ */
+#sidebar{position:fixed;top:0;left:0;bottom:0;width:300px;
+  background:var(--surface);border-right:1px solid var(--border);
+  z-index:300;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  padding-top:var(--safe-top);}
+#sidebar.open{transform:translateX(0);}
+@media(max-width:400px){#sidebar{width:88vw;}}
+.sidebar-hdr{display:flex;align-items:center;padding:14px 16px 10px;
+  border-bottom:1px solid var(--border);gap:10px;}
+.sidebar-hdr h2{font-size:13px;font-weight:700;flex:1;}
+.sidebar-close{background:none;border:none;color:var(--muted);font-size:20px;
+  cursor:pointer;line-height:1;padding:2px;}
+#histList{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+#histList::-webkit-scrollbar{width:3px;}
+#histList::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.hist-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;color:var(--muted);font-size:13px;text-align:center;gap:8px;padding:40px 20px;}
+.hist-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;cursor:pointer;transition:all .15s;}
+.hist-item:active{background:#1e222b;}
+.hist-item.hi{border-color:var(--accent);background:rgba(74,240,196,0.05);}
+.hist-q{font-size:12.5px;line-height:1.5;margin-bottom:6px;color:var(--text);}
+.hist-chips{display:flex;flex-wrap:wrap;gap:4px;}
+.hist-chip{font-size:10px;padding:2px 8px;border-radius:99px;
+  border:1px solid rgba(74,240,196,0.3);color:var(--accent);background:rgba(74,240,196,0.07);}
+.hist-chip.updated{border-color:rgba(255,255,255,0.2);color:var(--muted);background:rgba(255,255,255,0.04);}
+#sidebar-overlay{position:fixed;inset:0;z-index:299;display:none;}
+#sidebar-overlay.show{display:block;}
+
+/* ══ CONCEPT CARD (흰색 사각형 — 맵 위 중앙) ══ */
+#conceptCard{position:fixed;inset:0;z-index:200;display:none;
+  align-items:center;justify-content:center;padding:16px;}
+#conceptCard.show{display:flex;}
+#conceptCardOverlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);}
+.cc-box{position:relative;background:#ffffff;border:2px solid rgba(255,255,255,0.9);
+  border-radius:16px;width:100%;max-width:560px;max-height:calc(100vh - 100px);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 12px 48px rgba(0,0,0,0.6);z-index:1;}
+
+/* 카드 헤더 */
+.cc-header{display:flex;align-items:center;gap:10px;
+  padding:14px 16px 10px;border-bottom:1px solid #e5e7eb;background:#f8fafc;}
+.cc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.cc-title-view{flex:1;font-size:15px;font-weight:700;color:#0f172a;cursor:pointer;}
+.cc-title-edit{flex:1;font-size:15px;font-weight:700;color:#0f172a;background:#fff;
+  border:1px solid #d1d5db;border-radius:6px;padding:4px 8px;
+  font-family:'Noto Sans KR',sans-serif;outline:none;display:none;}
+.cc-close{background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:0 2px;}
+
+/* 카드 바디: 2열 레이아웃 */
+.cc-body{flex:1;overflow-y:auto;padding:14px 16px;display:flex;gap:14px;min-height:0;}
+.cc-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.cc-right{width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;}
+@media(max-width:480px){
+  .cc-body{flex-direction:column;}
+  .cc-right{width:100%;flex-direction:row;flex-wrap:wrap;}
+}
+
+/* 설명 영역 */
+.cc-desc-view{font-size:13px;color:#334155;line-height:1.8;white-space:pre-wrap;cursor:pointer;min-height:40px;}
+.cc-desc-view:empty::after{content:'설명을 탭하여 추가...';color:#94a3b8;font-style:italic;}
+.cc-desc-edit{font-size:13px;color:#0f172a;line-height:1.7;background:#f1f5f9;
+  border:1px solid #d1d5db;border-radius:8px;padding:10px;resize:none;
+  font-family:'Noto Sans KR',sans-serif;outline:none;min-height:100px;width:100%;display:none;}
+.cc-formula{display:block;margin:8px 0;line-height:1.8;overflow-x:auto;}
+.cc-formula .katex{font-size:1.05em;color:#1e293b;}
+.cc-formula-raw{display:block;font-family:'Space Mono',monospace;font-size:11px;
+  color:#64748b;margin:8px 0;line-height:1.7;}
+
+/* 이미지 영역 */
+.cc-img-slot{width:100%;aspect-ratio:4/3;border-radius:10px;border:1.5px dashed #cbd5e1;
+  background:#f8fafc;display:flex;align-items:center;justify-content:center;
+  color:#94a3b8;font-size:12px;cursor:pointer;overflow:hidden;position:relative;
+  text-align:center;line-height:1.5;}
+.cc-img-slot img{width:100%;height:100%;object-fit:cover;border-radius:8px;}
+.cc-img-slot .cc-img-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);
+  border:none;color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.cc-wiki-area{margin-top:4px;}
+.cc-wiki-img{width:100%;border-radius:8px;object-fit:contain;background:#f1f5f9;cursor:pointer;}
+.cc-wiki-caption{font-size:10px;color:#94a3b8;margin-top:3px;text-align:center;}
+
+/* 카드 푸터 */
+.cc-footer{display:flex;align-items:center;gap:8px;padding:10px 16px;
+  border-top:1px solid #e5e7eb;background:#f8fafc;}
+.cc-btn{border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;
+  font-family:'Noto Sans KR',sans-serif;cursor:pointer;}
+.cc-btn.save{background:#4af0c4;color:#0a0c10;display:none;}
+.cc-btn.cancel{background:#f1f5f9;color:#64748b;display:none;}
+.cc-btn.del{background:rgba(248,113,113,0.1);color:#f87171;}
+.cc-btn.edit{background:#f1f5f9;color:#334155;}
+.cc-btn.img-add{background:#f1f5f9;color:#334155;font-size:14px;padding:7px 10px;}
+.cc-footer-sep{flex:1;}
+
+/* ══ BOTTOM INPUT BAR ══ */
+#inputBar{position:fixed;left:0;right:0;bottom:0;z-index:200;
+  background:rgba(17,19,24,0.95);border-top:1px solid var(--border);
+  backdrop-filter:blur(12px);padding:10px 12px calc(10px + var(--safe-bot));}
+.input-row{display:flex;align-items:flex-end;gap:8px;}
+.input-wrap{flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .2s;}
+.input-wrap:focus-within{border-color:rgba(74,240,196,0.4);}
+#questionInput{background:transparent;border:none;color:var(--text);
+  font-family:'Noto Sans KR',sans-serif;font-size:13.5px;line-height:1.6;
+  padding:10px 12px 6px;resize:none;height:44px;max-height:120px;outline:none;overflow-y:auto;}
+#questionInput::placeholder{color:var(--muted);}
+.input-bottom-row{display:flex;align-items:center;padding:4px 8px 6px;gap:6px;}
+.img-attach-btn{background:none;border:none;color:var(--muted);font-size:16px;
+  cursor:pointer;padding:2px 4px;}
+.img-attach-btn:active{color:var(--accent);}
+.attached-img{position:relative;width:36px;height:36px;border-radius:6px;overflow:hidden;
+  border:1px solid var(--border);flex-shrink:0;}
+.attached-img img{width:100%;height:100%;object-fit:cover;}
+.attached-img .rm{position:absolute;top:0;right:0;background:rgba(0,0,0,.7);
+  border:none;color:#fff;width:14px;height:14px;font-size:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border-radius:0 0 0 4px;}
+.ib-sep{flex:1;}
+.send-btn{background:var(--accent);border:none;border-radius:10px;
+  color:#0a0c10;font-size:16px;width:44px;height:44px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s;}
+.send-btn:disabled{opacity:.35;cursor:not-allowed;}
+.send-btn.loading{background:var(--surface2);border:1px solid var(--border);}
+
+/* ══ CONNECT MODE HINT ══ */
+#connectHint{position:fixed;top:calc(56px + var(--safe-top));left:50%;
+  transform:translateX(-50%);background:rgba(17,19,24,0.9);
+  border:1px solid var(--border);border-radius:8px;
+  padding:6px 14px;font-size:11.5px;color:var(--accent);
+  z-index:150;pointer-events:none;white-space:nowrap;display:none;}
+#connectHint.show{display:block;}
+
+/* ══ LEGEND ══ */
+#legend{position:fixed;bottom:calc(80px + var(--safe-bot));left:14px;
+  background:rgba(17,19,24,0.85);border:1px solid var(--border);
+  border-radius:9px;padding:8px 12px;font-size:11px;
+  display:none;flex-direction:column;gap:5px;z-index:150;backdrop-filter:blur(8px);}
+#legend.show{display:flex;}
+.legend-item{display:flex;align-items:center;gap:7px;color:var(--muted);}
+.ldot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+/* ══ LIGHTBOX ══ */
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;
+  display:none;align-items:center;justify-content:center;}
+#lightbox.open{display:flex;}
+#lightbox img{max-width:92vw;max-height:88vh;border-radius:10px;object-fit:contain;}
+.lb-close{position:absolute;top:16px;right:16px;background:none;border:none;
+  color:#fff;font-size:28px;cursor:pointer;line-height:1;}
+
+/* ══ DOTS ANIMATION ══ */
+.dots span{display:inline-block;animation:blink 1.2s infinite;font-size:14px;}
+.dots span:nth-child(2){animation-delay:.2s;}
+.dots span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+input[type=file]{display:none;}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="ob-box">
+    <h1>나만의 <em>과학수학 뇌지도</em></h1>
+    <p>질문이 쌓일수록 개념들이 연결되는 지식 맵을 만들어요.</p>
+    <div class="ob-label">수강 과목 선택 (복수 가능)</div>
+    <div class="subject-grid" id="subjectGrid">
+      <div class="subj-chip" data-id="calculus">미분적분학</div>
+      <div class="subj-chip" data-id="linalg">선형대수학</div>
+      <div class="subj-chip" data-id="diffEq">공업수학/미분방정식</div>
+      <div class="subj-chip" data-id="physics">일반물리학</div>
+      <div class="subj-chip" data-id="em">전자기학/전자장론</div>
+      <div class="subj-chip" data-id="circuit">기초회로이론</div>
+      <div class="subj-chip" data-id="semicond">반도체공학</div>
+      <div class="subj-chip" data-id="quantum">양자역학</div>
+      <div class="subj-chip" data-id="thermo">열역학/통계역학</div>
+      <div class="subj-chip" data-id="signal">신호 및 시스템</div>
+    </div>
+    <button class="ob-start" id="obStart" onclick="startApp()" disabled>시작하기 →</button>
+  </div>
+</div>
+
+<!-- MAP CANVAS -->
+<div id="mapWrap"><canvas id="mapCanvas"></canvas></div>
+
+<!-- TOP BAR -->
+<div id="topBar">
+  <div class="logo">concept<span>map</span></div>
+  <div class="top-sep"></div>
+  <button class="icon-btn" id="btnHistory" onclick="toggleSidebar()" title="질문 히스토리">☰</button>
+  <button class="icon-btn" id="btnConnect" onclick="toggleConnect()" title="연결 편집">🔗</button>
+  <button class="icon-btn" onclick="fitView()" title="전체 보기">⊙</button>
+  <button class="icon-btn" onclick="openOnboarding()" title="과목 설정">📚</button>
+  <button class="icon-btn" style="color:#f87171" onclick="clearAll()" title="초기화">✕</button>
+</div>
+
+<!-- CONNECT HINT -->
+<div id="connectHint">노드 탭 → 다른 노드 탭으로 연결/해제 &nbsp;|&nbsp; ESC 취소</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div id="sidebar">
+  <div class="sidebar-hdr">
+    <h2>질문 히스토리</h2>
+    <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+  </div>
+  <div id="histList">
+    <div class="hist-empty" id="histEmpty">
+      <div style="font-size:28px;opacity:.3">💬</div>
+      <div>질문이 쌓이면<br>여기에 기록돼요</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONCEPT CARD (흰색 사각형) ══ -->
+<div id="conceptCard">
+  <div id="conceptCardOverlay" onclick="closeConceptCard()"></div>
+  <div class="cc-box">
+    <div class="cc-header">
+      <div class="cc-dot" id="ccDot"></div>
+      <div class="cc-title-view" id="ccTitleView" onclick="enterEditMode()"></div>
+      <input class="cc-title-edit" id="ccTitleEdit" type="text">
+      <button class="cc-close" onclick="closeConceptCard()">✕</button>
+    </div>
+    <div class="cc-body">
+      <div class="cc-left">
+        <div class="cc-desc-view" id="ccDescView" onclick="enterEditMode()"></div>
+        <textarea class="cc-desc-edit" id="ccDescEdit"></textarea>
+      </div>
+      <div class="cc-right" id="ccRight">
+        <div class="cc-img-slot" id="ccImgSlot" onclick="pickCardImage()">
+          사진 또는 그래프<br>(탭하여 추가)
+        </div>
+        <div class="cc-wiki-area" id="ccWikiArea"></div>
+      </div>
+    </div>
+    <div class="cc-footer">
+      <button class="cc-btn del" id="ccDelBtn" onclick="deleteNodeFromCard()">삭제</button>
+      <button class="cc-btn edit" id="ccEditBtn" onclick="enterEditMode()">✏️ 편집</button>
+      <button class="cc-btn cancel" id="ccCancelBtn" onclick="cancelEditMode()">취소</button>
+      <button class="cc-btn img-add" id="ccImgAddBtn" onclick="pickCardImage()" style="display:none">🖼️</button>
+      <div class="cc-footer-sep"></div>
+      <button class="cc-btn save" id="ccSaveBtn" onclick="saveFromCard()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="legend-item"><div class="ldot" style="background:#4af0c4"></div>상위 개념 (밝음)</div>
+  <div class="legend-item"><div class="ldot" style="background:#0d7a5f"></div>하위 개념 (어두움)</div>
+</div>
+
+<!-- BOTTOM INPUT BAR -->
+<div id="inputBar">
+  <div class="input-row">
+    <div class="input-wrap">
+      <textarea id="questionInput" placeholder="헷갈리는 걸 말하듯 입력하세요" rows="1"
+        oninput="autoResize(this)"></textarea>
+      <div class="input-bottom-row">
+        <button class="img-attach-btn" onclick="pickInputImage('gallery')" title="갤러리">🖼️</button>
+        <button class="img-attach-btn" onclick="pickInputImage('camera')" title="카메라">📷</button>
+        <div id="attachedImgWrap"></div>
+        <div class="ib-sep"></div>
+      </div>
+    </div>
+    <button class="send-btn" id="sendBtn" onclick="analyze()">↑</button>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lbImg" src="">
+</div>
+
+<!-- FILE INPUTS -->
+<input type="file" id="inputFileGallery" accept="image/*">
+<input type="file" id="inputFileCamera" accept="image/*" capture="environment">
+<input type="file" id="cardFileInput" accept="image/*">
+
+<script>
+const SN={calculus:'미분적분학',linalg:'선형대수학',diffEq:'공업수학/미분방정식',
+  physics:'일반물리학',em:'전자기학',circuit:'기초회로이론',
+  semicond:'반도체공학',quantum:'양자역학',thermo:'열역학/통계역학',signal:'신호및시스템'};
+const NR=44;
+
+let subjects=[], nodes=[], edges=[], sessionCount=0;
+let sessionTexts={}, sessionNodeMap={};
+let inputImg=null;
+let connectMode=false, connectFirst=null;
+let dragging=null, dragOX=0, dragOY=0;
+let panX=0, panY=0, panSX, panSY, panning=false;
+let scale=1;
+let focusNodeId=null, focusSessionIdx=null;
+let tapStartX=0, tapStartY=0, tapTarget=null;
+let cardEditMode=false;
+
+// STORAGE
+function save(){
+  try{
+    localStorage.setItem('cm4_nodes',JSON.stringify(nodes));
+    localStorage.setItem('cm4_edges',JSON.stringify(edges));
+    localStorage.setItem('cm4_subj',JSON.stringify(subjects));
+    localStorage.setItem('cm4_sess',sessionCount);
+    localStorage.setItem('cm4_stxt',JSON.stringify(sessionTexts));
+    localStorage.setItem('cm4_snm',JSON.stringify(sessionNodeMap));
+    localStorage.setItem('cm4_view',JSON.stringify({panX,panY,scale}));
+  }catch(e){}
+}
+function load(){
+  try{
+    nodes=JSON.parse(localStorage.getItem('cm4_nodes')||'[]');
+    edges=JSON.parse(localStorage.getItem('cm4_edges')||'[]');
+    subjects=JSON.parse(localStorage.getItem('cm4_subj')||'[]');
+    sessionCount=+localStorage.getItem('cm4_sess')||0;
+    sessionTexts=JSON.parse(localStorage.getItem('cm4_stxt')||'{}');
+    sessionNodeMap=JSON.parse(localStorage.getItem('cm4_snm')||'{}');
+    const v=JSON.parse(localStorage.getItem('cm4_view')||'null');
+    if(v){panX=v.panX;panY=v.panY;scale=v.scale;}
+  }catch(e){}
+}
+
+// ONBOARDING
+document.querySelectorAll('.subj-chip').forEach(c=>{
+  c.addEventListener('pointerup',()=>{
+    c.classList.toggle('sel');
+    document.getElementById('obStart').disabled=!document.querySelector('.subj-chip.sel');
+  });
+});
+function startApp(){
+  subjects=[...document.querySelectorAll('.subj-chip.sel')].map(c=>c.dataset.id);
+  document.getElementById('onboarding').style.display='none';
+  save(); redraw();
+  if(nodes.length){document.getElementById('legend').classList.add('show');fitView();}
+}
+function openOnboarding(){
+  document.querySelectorAll('.subj-chip').forEach(c=>c.classList.toggle('sel',subjects.includes(c.dataset.id)));
+  document.getElementById('obStart').disabled=!subjects.length;
+  document.getElementById('onboarding').style.display='flex';
+}
+
+// SIDEBAR
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  const open=sb.classList.toggle('open');
+  ov.classList.toggle('show',open);
+  document.getElementById('btnHistory').classList.toggle('active',open);
+  if(open) renderHistory();
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+  document.getElementById('btnHistory').classList.remove('active');
+}
+
+// ANALYZE
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+
+async function analyze(){
+  const input=document.getElementById('questionInput').value.trim();
+  if(!input) return;
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true;btn.classList.add('loading');
+  btn.innerHTML='<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
+
+  const existCtx=nodes.length
+    ? '\n\n기존 맵 노드:\n'+nodes.map(n=>'- ['+n.id+'] "'+n.label+'" (level:'+(n.level||0)+')').join('\n'):'';
+  const subjectStr=subjects.map(s=>SN[s]||s).join(', ')||'정보없음';
+
+  const prompt='당신은 이공계 학습 도우미입니다. JSON만 반환. 마크다운 없음.\n학생 수강 과목: '+subjectStr+'\n학생 질문: "'+input+'"'+existCtx+'\n\n[개념 계층 원칙]\n- level: 숫자가 낮을수록 상위(0=최상위). 하위 개념일수록 level 높음.\n- 상위 개념 body: 자신의 정의/역할만. 하위에서 다룰 내용 침범 금지.\n- 하위 개념이 등장하면 상위 개념 body는 더 간결해져도 됨.\n- 기존 노드에 이 질문 내용이 이미 포함되면 → updatedNodes에만 id 기재.\n\n[수식 기준]\n- 계산/수치 질문: 핵심 관계식 포함.\n- 비교 질문: 두 수식 나란히.\n- 이미 다른 노드에 쓴 수식: 중복 금지.\n- 기호는 반드시 교재/IEEE 표준 표기 사용.\n  예) 포화전류=I_s, 열전압=V_T=(kT/q)\n- 수식은 본문과 반드시 빈 줄로 구분해서 별도 줄에 작성.\n\n[지침]\n1. 학생이 직접 언급한 개념만 노드 생성.\n2. 기존 노드와 겹치면 updatedNodes에 id만.\n3. id: "n_'+Date.now()+'_숫자".\n\nJSON:\n{"newNodes":[{"id":"...","label":"학생이 쓴 단어","level":0,"body":"설명"}],"newEdges":[{"from":"id1","to":"id2"}],"existingEdges":[{"from":"기존id","to":"새id"}],"updatedNodes":["기존노드id"]}';
+
+  try{
+    const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt, image:inputImg||null})});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'HTTP '+res.status);}
+    const data=await res.json();
+    const parsed=safeJSON(data.text.replace(/```json|```/g,'').trim());
+    applyResult(parsed, input);
+    document.getElementById('questionInput').value='';
+    document.getElementById('questionInput').style.height='';
+    clearInputImg();
+  }catch(e){alert('오류: '+e.message);}
+  btn.disabled=false;btn.classList.remove('loading');btn.innerHTML='↑';
+}
+
+function safeJSON(s){
+  try{return JSON.parse(s);}catch(e){
+    const stack=[];
+    for(const ch of s){if(ch==='['||ch==='{')stack.push(ch);else if((ch===']'||ch==='}')&&stack.length)stack.pop();}
+    while(stack.length)s+=stack.pop()==='['?']':'}';
+    try{return JSON.parse(s);}catch(e2){return{newNodes:[],newEdges:[],existingEdges:[],updatedNodes:[]};}
+  }
+}
+
+function applyResult(p, questionText){
+  sessionCount++;
+  const W=canvas.width, H=canvas.height;
+  const cx=(W/2-panX)/scale, cy=(H/2-panY)/scale;
+  const nn=p.newNodes||[];
+  const thisSessionIds=[];
+  nn.forEach((node,i)=>{
+    const angle=(2*Math.PI*i/Math.max(nn.length,1))-Math.PI/2;
+    const r=Math.min(W,H)*0.22/scale;
+    node.x=cx+(nn.length===1?0:r*Math.cos(angle));
+    node.y=cy+(nn.length===1?0:r*Math.sin(angle));
+    node.sessionIdx=sessionCount;node.level=node.level||0;node.images=[];
+    nodes.push(node);thisSessionIds.push(node.id);
+  });
+  (p.updatedNodes||[]).forEach(id=>{
+    const n=nodes.find(x=>x.id===id);
+    if(n) n.lastUpdatedSession=sessionCount;
+    thisSessionIds.push(id);
+  });
+  [...(p.newEdges||[]),...(p.existingEdges||[])].forEach(e=>{
+    if(!edges.find(ex=>(ex.from===e.from&&ex.to===e.to)||(ex.from===e.to&&ex.to===e.from)))
+      edges.push(e);
+  });
+  sessionTexts[sessionCount]=questionText;
+  sessionNodeMap[sessionCount]=thisSessionIds;
+  save();redraw();fitView();
+  document.getElementById('legend').classList.add('show');
+  if(document.getElementById('sidebar').classList.contains('open')) renderHistory();
+}
+
+// HISTORY
+function renderHistory(){
+  const list=document.getElementById('histList');
+  const empty=document.getElementById('histEmpty');
+  list.querySelectorAll('.hist-item').forEach(el=>el.remove());
+  if(!sessionCount){empty.style.display='flex';return;}
+  empty.style.display='none';
+  for(let si=sessionCount;si>=1;si--){
+    const q=sessionTexts[si]||('질문 '+si);
+    const ids=sessionNodeMap[si]||[];
+    const item=document.createElement('div');
+    item.className='hist-item'+(focusSessionIdx===si?' hi':'');
+    const qEl=document.createElement('div');qEl.className='hist-q';qEl.textContent=q;
+    item.appendChild(qEl);
+    const chips=document.createElement('div');chips.className='hist-chips';
+    ids.forEach(id=>{
+      const n=nodes.find(x=>x.id===id);if(!n)return;
+      const chip=document.createElement('span');
+      chip.className='hist-chip'+(n.sessionIdx===si?'':' updated');
+      chip.textContent=n.label;chips.appendChild(chip);
+    });
+    item.appendChild(chips);
+    item.addEventListener('pointerup',()=>toggleSessionHighlight(si));
+    list.appendChild(item);
+  }
+}
+function toggleSessionHighlight(si){
+  focusSessionIdx=focusSessionIdx===si?null:si;
+  renderHistory();redraw();
+}
+
+// CANVAS
+const canvas=document.getElementById('mapCanvas');
+const ctx=canvas.getContext('2d');
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;redraw();}
+window.addEventListener('resize',resize);
+setTimeout(resize,50);
+function c2w(cx,cy){return{x:(cx-panX)/scale,y:(cy-panY)/scale};}
+function hitNode(wx,wy){return nodes.find(n=>Math.hypot(n.x-wx,n.y-wy)<NR+8);}
+
+function nodeColor(node){
+  const levels=['#4af0c4','#2db896','#1a8a6f','#0d5e4a'];
+  return levels[Math.min(node.level||0,levels.length-1)];
+}
+
+function redraw(){
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(panX,panY);ctx.scale(scale,scale);
+  const hiIds=focusSessionIdx?(sessionNodeMap[focusSessionIdx]||[]):[];
+  const isFocusSession=hiIds.length>0;
+
+  edges.forEach(e=>{
+    const f=nodes.find(n=>n.id===e.from), t=nodes.find(n=>n.id===e.to);
+    if(!f||!t)return;
+    const hiNode=focusNodeId&&(e.from===focusNodeId||e.to===focusNodeId);
+    const hiSess=isFocusSession&&hiIds.includes(e.from)&&hiIds.includes(e.to);
+    ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(t.x,t.y);
+    if(hiNode){ctx.strokeStyle='rgba(74,240,196,0.9)';ctx.lineWidth=3/scale;}
+    else if(hiSess){ctx.strokeStyle='rgba(74,240,196,0.6)';ctx.lineWidth=2.5/scale;}
+    else{ctx.strokeStyle='rgba(148,163,184,0.28)';ctx.lineWidth=1.8/scale;}
+    ctx.stroke();
+  });
+
+  nodes.forEach(node=>{
+    const col=nodeColor(node);
+    const isFocused=node.id===focusNodeId;
+    const isHiSess=isFocusSession&&hiIds.includes(node.id);
+    const g=ctx.createRadialGradient(node.x,node.y,NR*0.3,node.x,node.y,NR*1.7);
+    g.addColorStop(0,col+(isFocused||isHiSess?'30':'18'));
+    g.addColorStop(1,'transparent');
+    ctx.beginPath();ctx.arc(node.x,node.y,NR*1.7,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+
+    ctx.beginPath();ctx.arc(node.x,node.y,NR,0,Math.PI*2);ctx.fillStyle='#0d1117';ctx.fill();
+    if(isFocused){ctx.strokeStyle=col;ctx.lineWidth=3/scale;}
+    else if(isHiSess){ctx.strokeStyle=col;ctx.lineWidth=2/scale;}
+    else if(connectFirst===node.id){ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5/scale;}
+    else{ctx.strokeStyle='rgba(148,163,184,0.4)';ctx.lineWidth=1.5/scale;}
+    ctx.stroke();
+
+    ctx.fillStyle=isFocused||isHiSess?col:'rgba(226,232,240,0.85)';
+    ctx.font='600 '+11/scale+'px "Noto Sans KR",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const wrapped=wrapLabel(node.label,NR*1.65/scale);
+    const lh=14/scale;
+    wrapped.forEach((ln,i)=>ctx.fillText(ln,node.x,node.y+(i-(wrapped.length-1)/2)*lh));
+  });
+  ctx.restore();
+}
+
+function wrapLabel(text,maxPx){
+  ctx.save();ctx.font='600 11px "Noto Sans KR",sans-serif';
+  const lines=[];
+  if(text.indexOf(' ')===-1){
+    let line='';
+    for(const ch of text){
+      if(ctx.measureText(line+ch).width>maxPx&&line){lines.push(line);line=ch;}else line+=ch;
+    }
+    if(line)lines.push(line);ctx.restore();return lines.length?lines:[text];
+  }
+  const words=text.split(' ');let line='';
+  words.forEach(w=>{
+    const test=line?line+' '+w:w;
+    if(ctx.measureText(test).width>maxPx&&line){lines.push(line);line=w;}else line=test;
+  });
+  if(line)lines.push(line);ctx.restore();return lines.length?lines:[text];
+}
+
+// POINTER EVENTS
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();canvas.setPointerCapture(e.pointerId);
+  const {x,y}=c2w(e.offsetX,e.offsetY);
+  const hit=hitNode(x,y);
+  tapStartX=e.clientX;tapStartY=e.clientY;tapTarget=hit||null;
+  if(connectMode){
+    if(hit){
+      if(!connectFirst){connectFirst=hit.id;redraw();}
+      else if(connectFirst!==hit.id){
+        const idx=edges.findIndex(ex=>(ex.from===connectFirst&&ex.to===hit.id)||(ex.from===hit.id&&ex.to===connectFirst));
+        if(idx>=0)edges.splice(idx,1);else edges.push({from:connectFirst,to:hit.id});
+        connectFirst=null;save();redraw();
+      }else{connectFirst=null;redraw();}
+    }return;
+  }
+  if(hit){dragging=hit;dragOX=x-hit.x;dragOY=y-hit.y;}
+  else{panning=true;panSX=e.clientX-panX;panSY=e.clientY-panY;}
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!dragging&&!panning)return;e.preventDefault();
+  const {x,y}=c2w(e.offsetX,e.offsetY);
+  if(dragging){dragging.x=x-dragOX;dragging.y=y-dragOY;redraw();return;}
+  if(panning){panX=e.clientX-panSX;panY=e.clientY-panSY;redraw();}
+});
+canvas.addEventListener('pointerup',e=>{
+  const moved=Math.hypot(e.clientX-tapStartX,e.clientY-tapStartY);
+  if(!connectMode&&moved<8&&!dragging){
+    if(tapTarget){
+      if(focusNodeId===tapTarget.id) closeConceptCard();
+      else openConceptCard(tapTarget.id);
+    } else {
+      closeConceptCard();focusSessionIdx=null;redraw();
+    }
+  }
+  if(dragging)save();
+  dragging=null;panning=false;tapTarget=null;
+});
+canvas.addEventListener('pointercancel',()=>{dragging=null;panning=false;});
+
+// 핀치 줌
+let pinchDist=0;
+canvas.addEventListener('touchstart',e=>{
+  if(e.touches.length===2)
+    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+},{passive:true});
+canvas.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    e.preventDefault();
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const r=d/pinchDist;pinchDist=d;
+    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+    const my=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    panX=mx-(mx-panX)*r;panY=my-(my-panY)*r;
+    scale=Math.max(0.15,Math.min(4,scale*r));redraw();
+  }
+},{passive:false});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const d=e.deltaY>0?0.88:1.13;
+  panX=e.offsetX-(e.offsetX-panX)*d;panY=e.offsetY-(e.offsetY-panY)*d;
+  scale=Math.max(0.15,Math.min(4,scale*d));redraw();
+},{passive:false});
+
+// ══ CONCEPT CARD ══
+function toLatex(expr){
+  return expr
+    .replace(/\(([^)]+)\)\/\(([^)]+)\)/g,'\\frac{$1}{$2}')
+    .replace(/([A-Za-z0-9_{}]+)\/([A-Za-z0-9_{}]+)/g,'\\frac{$1}{$2}')
+    .replace(/([A-Za-z])_([A-Za-z0-9]{2,})/g,'$1_{$2}')
+    .replace(/([A-Za-z])\^([A-Za-z0-9]{2,})/g,'$1^{$2}')
+    .replace(/\bexp\b/g,'\\exp')
+    .replace(/\*/g,'\\cdot ')
+    .replace(/Delta/g,'\\Delta ')
+    .replace(/mu_/g,'\\mu_')
+    .replace(/epsilon/g,'\\varepsilon')
+    .replace(/>=|≥/g,'\\geq ')
+    .replace(/<=|≤/g,'\\leq ')
+    .replace(/!=/g,'\\neq ')
+    .replace(/approx|≈/g,'\\approx ');
+}
+function renderFormula(t){
+  const span=document.createElement('span');span.className='cc-formula';
+  const latex=toLatex(t);
+  try{katex.render(latex,span,{throwOnError:false,displayMode:true});}
+  catch(e){span.className='cc-formula-raw';span.textContent=t;}
+  return span.outerHTML;
+}
+function formatBody(text){
+  const lines=text.split('\n');const result=[];
+  lines.forEach(line=>{
+    const t=line.trim();
+    if(!t){result.push('<br>');return;}
+    const isFormula=(t.includes('=')&&/[A-Za-z_]/.test(t)&&!/^[가-힣]{2}/.test(t))
+      ||/^[A-Za-z_\(].*[=<>≈]/.test(t)||/^[IiVvJjEe][_a-zA-Z]/.test(t);
+    if(isFormula){
+      if(result.length&&result[result.length-1]!=='<br>')result.push('<br>');
+      if(typeof katex!=='undefined')result.push(renderFormula(t));
+      else result.push('<span class="cc-formula-raw">'+t+'</span>');
+      result.push('<br>');
+    } else {
+      result.push('<span style="display:block;color:#334155">'+t+'</span>');
+    }
+  });
+  return result.join('');
+}
+
+function openConceptCard(id){
+  const node=nodes.find(n=>n.id===id);if(!node)return;
+  focusNodeId=id;cardEditMode=false;
+  const col=nodeColor(node);
+  document.getElementById('ccDot').style.background=col;
+  document.getElementById('ccTitleView').textContent=node.label;
+  document.getElementById('ccTitleView').style.display='';
+  document.getElementById('ccTitleEdit').style.display='none';
+  document.getElementById('ccDescView').innerHTML=node.body?formatBody(node.body):'';
+  document.getElementById('ccDescView').style.display='';
+  document.getElementById('ccDescEdit').style.display='none';
+
+  // 이미지
+  const slot=document.getElementById('ccImgSlot');
+  const imgs=node.images||[];
+  if(imgs.length>0){
+    slot.innerHTML='<img src="'+imgs[0]+'" onclick="openLightbox(\''+imgs[0]+'\')"><button class="cc-img-del" onclick="event.stopPropagation();removeCardImage(0)">✕</button>';
+  } else {
+    slot.innerHTML='사진 또는 그래프<br>(탭하여 추가)';
+  }
+
+  // 편집/저장 버튼 상태
+  document.getElementById('ccEditBtn').style.display='';
+  document.getElementById('ccSaveBtn').style.display='none';
+  document.getElementById('ccCancelBtn').style.display='none';
+  document.getElementById('ccImgAddBtn').style.display='none';
+  document.getElementById('ccDelBtn').style.display='';
+
+  document.getElementById('conceptCard').classList.add('show');
+  redraw();
+  fetchWikiImage(node.label, node.wikiImg);
+}
+
+function closeConceptCard(){
+  focusNodeId=null;cardEditMode=false;
+  document.getElementById('conceptCard').classList.remove('show');
+  redraw();
+}
+
+function enterEditMode(){
+  if(cardEditMode) return;
+  cardEditMode=true;
+  const node=nodes.find(n=>n.id===focusNodeId);if(!node)return;
+
+  document.getElementById('ccTitleView').style.display='none';
+  document.getElementById('ccTitleEdit').style.display='';
+  document.getElementById('ccTitleEdit').value=node.label;
+
+  document.getElementById('ccDescView').style.display='none';
+  document.getElementById('ccDescEdit').style.display='';
+  document.getElementById('ccDescEdit').value=node.body||'';
+
+  document.getElementById('ccEditBtn').style.display='none';
+  document.getElementById('ccSaveBtn').style.display='';
+  document.getElementById('ccCancelBtn').style.display='';
+  document.getElementById('ccImgAddBtn').style.display='';
+}
+
+function cancelEditMode(){
+  cardEditMode=false;
+  openConceptCard(focusNodeId);
+}
+
+function saveFromCard(){
+  const node=nodes.find(n=>n.id===focusNodeId);if(!node)return;
+  node.label=document.getElementById('ccTitleEdit').value;
+  node.body=document.getElementById('ccDescEdit').value;
+  save();redraw();
+  cardEditMode=false;
+  openConceptCard(focusNodeId);
+}
+
+function deleteNodeFromCard(){
+  if(!confirm('삭제할까요?'))return;
+  const id=focusNodeId;
+  nodes=nodes.filter(n=>n.id!==id);
+  edges=edges.filter(e=>e.from!==id&&e.to!==id);
+  closeConceptCard();save();redraw();
+}
+
+function removeCardImage(idx){
+  const node=nodes.find(n=>n.id===focusNodeId);if(!node)return;
+  node.images.splice(idx,1);save();openConceptCard(focusNodeId);
+}
+
+function pickCardImage(){
+  const el=document.getElementById('cardFileInput');
+  el.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      const node=nodes.find(n=>n.id===focusNodeId);if(!node)return;
+      if(!node.images)node.images=[];
+      node.images.push(ev.target.result);
+      save();openConceptCard(focusNodeId);
+    };
+    r.readAsDataURL(f);el.value='';
+  };
+  el.click();
+}
+
+// WIKIPEDIA
+async function fetchWikiImage(label, cachedUrl){
+  const area=document.getElementById('ccWikiArea');if(!area)return;
+  area.innerHTML='';
+  if(cachedUrl){showWikiImg(area,cachedUrl,label);return;}
+  if(/^[A-Za-z_=^{}\\]+$/.test(label.replace(/\s/g,'')))return;
+  area.innerHTML='<div style="font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic">🔍 관련 다이어그램 검색 중...</div>';
+  try{
+    const query=encodeURIComponent(label.replace(/[()]/g,' ').trim());
+    const res=await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+query,{signal:AbortSignal.timeout(4000)});
+    if(!res.ok)throw new Error('not found');
+    const data=await res.json();
+    if(data.thumbnail&&data.thumbnail.source){
+      const imgUrl=data.thumbnail.source.replace(/\/\d+px-/,'/300px-');
+      const node=nodes.find(n=>n.label===label);
+      if(node){node.wikiImg=imgUrl;save();}
+      showWikiImg(area,imgUrl,data.title||label);
+    } else area.innerHTML='';
+  }catch(e){area.innerHTML='';}
+}
+function showWikiImg(area,src,caption){
+  area.innerHTML='<img class="cc-wiki-img" src="'+src+'" alt="'+caption+'" onclick="openLightbox(\''+src+'\')" onerror="this.parentElement.innerHTML=\'\'"><div class="cc-wiki-caption">📖 Wikipedia: '+caption+'</div>';
+}
+
+// CONNECT MODE
+function toggleConnect(){
+  connectMode=!connectMode;connectFirst=null;
+  document.getElementById('btnConnect').classList.toggle('active',connectMode);
+  document.getElementById('connectHint').classList.toggle('show',connectMode);redraw();
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(connectMode){connectFirst=null;redraw();}closeConceptCard();}
+});
+
+// FIT VIEW
+function fitView(){
+  if(!nodes.length)return;
+  const W=canvas.width,H=canvas.height;
+  const xs=nodes.map(n=>n.x),ys=nodes.map(n=>n.y);
+  const minX=Math.min(...xs)-NR*2.5,maxX=Math.max(...xs)+NR*2.5;
+  const minY=Math.min(...ys)-NR*2.5,maxY=Math.max(...ys)+NR*2.5;
+  const dw=maxX-minX||1,dh=maxY-minY||1;
+  const usableH=H-80;
+  scale=Math.min(3,Math.max(0.15,Math.min(W/dw,usableH/dh)*0.85));
+  panX=W/2-(minX+dw/2)*scale;panY=(usableH/2)-(minY+dh/2)*scale;
+  save();redraw();
+}
+
+// IMAGE INPUT
+function pickInputImage(src){
+  const el=src==='camera'?document.getElementById('inputFileCamera'):document.getElementById('inputFileGallery');
+  el.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{inputImg=ev.target.result;renderAttachedImg();};
+    r.readAsDataURL(f);el.value='';
+  };el.click();
+}
+function renderAttachedImg(){
+  const wrap=document.getElementById('attachedImgWrap');wrap.innerHTML='';
+  if(!inputImg)return;
+  const d=document.createElement('div');d.className='attached-img';
+  d.innerHTML='<img src="'+inputImg+'"><button class="rm" onclick="clearInputImg()">✕</button>';
+  wrap.appendChild(d);
+}
+function clearInputImg(){inputImg=null;renderAttachedImg();}
+
+// LIGHTBOX
+function openLightbox(src){document.getElementById('lbImg').src=src;document.getElementById('lightbox').classList.add('open');}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
+document.getElementById('lightbox').addEventListener('pointerup',e=>{
+  if(e.target===document.getElementById('lightbox'))closeLightbox();
+});
+
+// CLEAR
+function clearAll(){
+  if(!confirm('맵을 초기화할까요?'))return;
+  nodes=[];edges=[];sessionCount=0;sessionTexts={};sessionNodeMap={};
+  panX=0;panY=0;scale=1;focusNodeId=null;focusSessionIdx=null;
+  closeConceptCard();save();redraw();
+  document.getElementById('legend').classList.remove('show');
+}
+
+// KEYBOARD
+document.getElementById('questionInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))analyze();
+});
+
+// PWA
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;});
+
+// INIT
+load();
+if(subjects.length){
+  document.querySelectorAll('.subj-chip').forEach(c=>c.classList.toggle('sel',subjects.includes(c.dataset.id)));
+  document.getElementById('onboarding').style.display='none';
+  redraw();
+  if(nodes.length){document.getElementById('legend').classList.add('show');setTimeout(fitView,100);}
+}
+</script>
+</body>
+</html>
