@@ -1708,6 +1708,58 @@ function renderLatex(text) {
   });
   return html;
 }
+// ═══════════════════════════════════════════
+// 8. 개념카드 내 인라인 수식($...$) 렌더링 해결
+// ═══════════════════════════════════════════
+function buildCardBody(node){
+  const body=node.body||'';
+  if(!body)return '<div class="cc-def" style="color:#94a3b8;font-style:italic">아직 내용 없음 — 관련 질문을 하면 채워져요</div>';
+
+  const lines=body.split('\n');
+  let html='';
+
+  lines.forEach(line=>{
+    const t=line.trim();
+    if(!t){html+='<div style="height:6px"></div>';return;}
+
+    // 섹션 헤더 감지
+    const secMatch=t.match(/^\[(.+?)\]$/);
+    if(secMatch){
+      html+='<div class="cc-section"><div class="cc-section-title">'+secMatch[1]+'</div></div>';
+      return;
+    }
+
+    // 통째로 수식인 줄인지 확인
+    const isFormula=/^\$(.+)\$$/.test(t) || (t.includes('=')&&/^[A-Za-z∇δΔ\\]/.test(t)&&!/^[가-힣]{2}/.test(t));
+
+    if(isFormula){
+      let tex=t.replace(/^\$|\$$/g,'');
+      html+='<div class="cc-formula-block">';
+      if(typeof katex!=='undefined'){
+        html+=renderKatex(tex);
+      }else{
+        html+='<span class="cc-formula-raw">'+tex+'</span>';
+      }
+      html+='</div>';
+    }else{
+      // 일반 텍스트 처리
+      let formatted=t.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#0f172a">$1</strong>');
+      
+      // ★ 핵심: 일반 글자 사이에 있는 $...$ 인라인 수식도 모조리 변환! ★
+      formatted = formatted.replace(/\$(.+?)\$/g, function(match, formula) {
+        if(typeof katex !== 'undefined') {
+          try {
+            return katex.renderToString(formula, {throwOnError: false});
+          } catch(e) { return match; }
+        }
+        return match;
+      });
+      
+      html+='<div class="cc-def">'+formatted+'</div>';
+    }
+  });
+  return html;
+}
 
 </script>
 </body>
