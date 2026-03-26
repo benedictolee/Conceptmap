@@ -1665,6 +1665,33 @@ function redraw(){
   ctx.restore();
 }
 
+  
+// ═══════════════════════════════════════════
+// 6. 시점 이동(카메라) 버그 수정 (고화질 디스플레이 해상도 대응)
+// ═══════════════════════════════════════════
+
+// 노드 클릭 시 화면 상단 중앙으로 부드럽게 끌고 오는 함수
+function panToNode(node){
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr, H = canvas.height / dpr; // 뻥튀기된 화질을 실제 화면 크기로 다시 보정
+  // 가로 중앙(W/2), 세로 상단 27%(H*0.27) 위치로 이동
+  animatePan(W/2 - node.x*scale, H*0.27 - node.y*scale, 380);
+}
+
+// 상단 ⊙ 버튼 (전체 노드 한눈에 보기) 누를 때 화면 중앙에 맞추는 함수
+function fitView(){
+  if(!nodes.length)return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr, H = canvas.height / dpr;
+  const xs=nodes.map(n=>n.x),ys=nodes.map(n=>n.y);
+  const minX=Math.min(...xs)-NR*2.5,maxX=Math.max(...xs)+NR*2.5;
+  const minY=Math.min(...ys)-NR*2.5,maxY=Math.max(...ys)+NR*2.5;
+  const dw=maxX-minX||1,dh=maxY-minY||1;
+  const usableH=H-80; // 하단 입력창 높이 제외
+  scale=Math.min(3,Math.max(0.15,Math.min(W/dw,usableH/dh)*0.85));
+  animatePan(W/2-(minX+dw/2)*scale, usableH/2-(minY+dh/2)*scale, 400);
+}
+
 </script>
 </body>
 </html>
