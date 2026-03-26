@@ -14,39 +14,41 @@ export default async function handler(req, res) {
   const { prompt, image } = body || {};
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // ★ 1. Vercel에서 GEMINI_API_KEY를 가져오도록 변경
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
 
   try {
-    // 이미지가 있으면 vision 모드 — content를 배열로 구성
-    let messageContent;
+    // ★ 2. Gemini 규격에 맞게 데이터 배열(parts) 구성
+    let parts = [];
+    
+    // 이미지가 있으면 base64 데이터 추출해서 추가
     if (image) {
-      // image = "data:image/jpeg;base64,xxxx..." 형식
       const matches = image.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) return res.status(400).json({ error: 'Invalid image format' });
-      const [, mediaType, base64Data] = matches;
-      messageContent = [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type: mediaType, data: base64Data }
-        },
-        { type: 'text', text: prompt }
-      ];
-    } else {
-      messageContent = prompt;
+      const [, mimeType, base64Data] = matches;
+      
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      });
     }
+    
+    // 텍스트 프롬프트 추가
+    parts.push({ text: prompt });
 
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    // ★ 3. Gemini 1.5 Flash 엔드포인트로 전송
+    const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: messageContent }],
+        contents: [{ role: 'user', parts: parts }],
+        // 프론트엔드 에러 방지를 위해 JSON 형태로만 대답하라고 강제
+        generationConfig: { responseMimeType: "application/json" }
       }),
     });
 
@@ -56,7 +58,10 @@ export default async function handler(req, res) {
     }
 
     const data = await upstream.json();
-    const text = data.content?.map(c => c.text || '').join('') || '';
+    
+    // ★ 4. Gemini의 응답 구조에서 텍스트만 쏙 빼오기
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
     return res.status(200).json({ text });
 
   } catch (e) {
