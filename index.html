@@ -1691,6 +1691,23 @@ function fitView(){
   scale=Math.min(3,Math.max(0.15,Math.min(W/dw,usableH/dh)*0.85));
   animatePan(W/2-(minX+dw/2)*scale, usableH/2-(minY+dh/2)*scale, 400);
 }
+// ═══════════════════════════════════════════
+// 7. 히스토리 창 에러 해결 (누락된 수식 렌더링 함수 추가)
+// ═══════════════════════════════════════════
+function renderLatex(text) {
+  if (!text) return '';
+  // 줄바꿈 처리
+  let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  // $...$ 로 감싸진 수학 수식을 예쁘게 변환 (KaTeX)
+  html = html.replace(/\$(.+?)\$/g, function(match, formula) {
+    try {
+      return katex.renderToString(formula, {throwOnError: false});
+    } catch(e) {
+      return `<span style="color:#4af0c4; font-family:monospace;">${match}</span>`;
+    }
+  });
+  return html;
+}
 
 </script>
 </body>
