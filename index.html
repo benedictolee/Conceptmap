@@ -1447,6 +1447,45 @@ function goHome(){ showHomeScreen(); }
     }
   }
 })();
+
+  // ═══════════════════════════════════════════
+// 노드 접기/펼치기 핵심 로직 (추가)
+// ═══════════════════════════════════════════
+
+function hasChildren(id) {
+  return edges.some(e => e.from === id);
+}
+
+function toggleCollapse(id) {
+  if (collapsedNodes.has(id)) {
+    collapsedNodes.delete(id);
+  } else {
+    collapsedNodes.add(id);
+  }
+  save();
+  redraw();
+}
+
+function getHiddenNodeIds() {
+  const hidden = new Set();
+  
+  for (let cid of collapsedNodes) {
+    let queue = [cid];
+    while (queue.length > 0) {
+      let curr = queue.shift();
+      let children = edges.filter(e => e.from === curr).map(e => e.to);
+      
+      for (let child of children) {
+        if (!hidden.has(child)) {
+          hidden.add(child);
+          queue.push(child);
+        }
+      }
+    }
+  }
+  return hidden;
+}
+
 </script>
 </body>
 </html>
