@@ -1485,6 +1485,185 @@ function getHiddenNodeIds() {
   }
   return hidden;
 }
+// ═══════════════════════════════════════════
+// 🚀 최종 업데이트: 단원(n.n.n) 접기 + 엣지 3단어 라벨 + 고화질/디자인 복구
+// ═══════════════════════════════════════════
+
+// 1. 누락되었던 6.1, 6.2 단원 이름 강제 주입
+TEXTBOOK['6.1'] = 'PN접합 특성';
+TEXTBOOK['6.2'] = 'PN접합 다이오드';
+
+// 2. 연결선(Edge) 무시하고 오직 앞번호(n.n.n) 기준으로만 하위개념 판별
+function hasChildren(id) {
+  const prefix = id + '.';
+  return nodes.some(n => n.id.startsWith(prefix));
+}
+
+// 3. 접기 버튼을 누르면 해당 번호(n.n.n)로 시작하는 모든 하위 단원 숨김
+function getHiddenNodeIds() {
+  const hidden = new Set();
+  for (let cid of collapsedNodes) {
+    const prefix = cid + '.';
+    nodes.forEach(n => {
+      if (n.id.startsWith(prefix)) hidden.add(n.id);
+    });
+  }
+  return hidden;
+}
+
+// 4. 질문(Question)에서 키워드 3단어를 추출해 엣지에 라벨로 저장
+function applyResult(p, questionText) {
+  sessionCount++;
+  const W=canvas.width, H=canvas.height;
+  const cx=(W/2-panX)/scale, cy=(H/2-panY)/scale;
+  const chapters=p.chapters||[];
+  const details=p.chapterDetails||[];
+  const newChapters=[];
+
+  details.forEach(d=>{
+    if(nodes.find(n=>n.id===d.id))return; 
+    if(!TEXTBOOK[d.id] && /^\d+(\.\d+)*$/.test(d.id))return; 
+    newChapters.push(d.id);
+  });
+
+  const total=newChapters.length;
+  newChapters.forEach((chId,i)=>{
+    const angle=(2*Math.PI*i/Math.max(total,1))-Math.PI/2;
+    const r=total===1?0:Math.min(W,H)*0.2/scale;
+    const detail=details.find(d=>d.id===chId);
+    nodes.push({
+      id:chId, x:cx+r*Math.cos(angle), y:cy+r*Math.sin(angle),
+      body:detail?detail.body:'', sessionIdx:sessionCount
+    });
+  });
+
+  // ★ 핵심: 질문 내용 중 앞 3단어만 짤라서 라벨로 저장
+  const qWords = questionText ? questionText.split(/\s+/).slice(0,3).join(' ') : '';
+  (p.edges||[]).forEach(e=>{
+    if(!edges.find(ex=>(ex.from===e.from&&ex.to===e.to)||(ex.from===e.to&&ex.to===e.from)))
+      edges.push({from: e.from, to: e.to, label: qWords}); // 엣지에 라벨 부착!
+  });
+
+  sessionData[sessionCount]={ question:questionText, answer:p.explanation||'', chapters:chapters };
+  save();redraw();fitView();
+  document.getElementById('legend').classList.add('show');
+  if(document.getElementById('sidebar').classList.contains('open'))renderHistory();
+}
+
+// 5. 디자인 & 고화질 렌더링 복구 (선명한 글씨 + 커스텀 노란색)
+function nodeColor(node){
+  if (!/^\d+(\.\d+)*$/.test(node.id)) return '#fbbf24'; // 추가개념 = 노란색
+  return '#4af0c4'; // 교재단원 = 청록색
+}
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1; // 스마트폰 고화질 대응
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  redraw();
+}
+
+function redraw(){
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.width / dpr, H = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); 
+  ctx.clearRect(0,0,W,H);
+  ctx.save();ctx.translate(panX,panY);ctx.scale(scale,scale);
+
+  const hiChapters=focusSessionIdx&&sessionData[focusSessionIdx]?sessionData[focusSessionIdx].chapters:[];
+  const hasHi=hiChapters.length>0;
+  const hiddenIds=getHiddenNodeIds();
+
+  // ★ 엣지(연결선) 및 3단어 라벨 그리기
+  edges.forEach(e=>{
+    if(hiddenIds.has(e.from)||hiddenIds.has(e.to))return; // 접힌 단원의 선은 투명화
+    const f=nodes.find(n=>n.id===e.from),t=nodes.find(n=>n.id===e.to);
+    if(!f||!t)return;
+
+    const hiNode=focusNodeId&&(e.from===focusNodeId||e.to===focusNodeId);
+    const hiSess=hasHi&&hiChapters.includes(e.from)&&hiChapters.includes(e.to);
+    
+    ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(t.x,t.y);
+    if(hiNode){ctx.strokeStyle='rgba(74,240,196,0.9)';ctx.lineWidth=3/scale;}
+    else if(hiSess){ctx.strokeStyle='rgba(74,240,196,0.6)';ctx.lineWidth=2.5/scale;}
+    else{ctx.strokeStyle='rgba(148,163,184,0.25)';ctx.lineWidth=1.5/scale;}
+    ctx.stroke();
+
+    // 연결선 위에 질문 3단어 라벨 띄우기
+    if(e.label) {
+      const mx = (f.x + t.x) / 2, my = (f.y + t.y) / 2;
+      ctx.font = '400 ' + 9/scale + 'px "Noto Sans KR", sans-serif';
+      const txtW = ctx.measureText(e.label).width + 10/scale;
+      
+      ctx.fillStyle = 'rgba(10,12,16,0.85)'; // 배경 깔아주기
+      ctx.fillRect(mx - txtW/2, my - 7/scale, txtW, 14/scale);
+      
+      ctx.fillStyle = '#4af0c4'; // 글씨는 예쁜 청록색
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(e.label, mx, my + 1/scale);
+    }
+  });
+
+  // 노드 그리기
+  nodes.forEach(node=>{
+    if(hiddenIds.has(node.id))return;
+    const col=nodeColor(node);
+    const isFocused=node.id===focusNodeId;
+    const isHi=hasHi&&hiChapters.includes(node.id);
+    const isCustom = !/^\d+(\.\d+)*$/.test(node.id); 
+
+    const g=ctx.createRadialGradient(node.x,node.y,NR*0.3,node.x,node.y,NR*1.7);
+    g.addColorStop(0,col+(isFocused||isHi?'30':'15'));
+    g.addColorStop(1,'transparent');
+    ctx.beginPath();ctx.arc(node.x,node.y,NR*1.7,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+
+    ctx.beginPath();ctx.arc(node.x,node.y,NR,0,Math.PI*2);ctx.fillStyle='#0d1117';ctx.fill();
+    if(isFocused){ctx.strokeStyle=col;ctx.lineWidth=3/scale;}
+    else if(isHi){ctx.strokeStyle=col;ctx.lineWidth=2.5/scale;}
+    else if(connectFirst===node.id){ctx.strokeStyle='#fff';ctx.lineWidth=2.5/scale;}
+    else{ctx.strokeStyle=col+'99';ctx.lineWidth=(isCustom?2:1.5)/scale;}
+    ctx.stroke();
+
+    ctx.fillStyle=isFocused||isHi?col:'rgba(226,232,240,0.85)';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+
+    const name = TEXTBOOK[node.id] || (isCustom ? node.id.replace(/_/g, ' ') : '');
+
+    if (isCustom) {
+        ctx.fillStyle = col;
+        ctx.font='700 '+11/scale+'px "Space Mono",monospace';
+        ctx.fillText('★', node.x, node.y - 12/scale);
+        ctx.font='600 '+10/scale+'px "Noto Sans KR",sans-serif';
+        ctx.fillText(wrapLabel(name, NR*1.6/scale)[0]||'', node.x, node.y + 4/scale);
+    } else {
+        ctx.font='700 '+11/scale+'px "Space Mono",monospace';
+        ctx.fillText(node.id, node.x, node.y - 6/scale);
+        if(name){
+          ctx.font='400 '+9/scale+'px "Noto Sans KR",sans-serif';
+          ctx.fillStyle=isFocused||isHi?col:'rgba(148,163,184,0.7)';
+          const wrapped=wrapLabel(name,NR*1.6/scale);
+          wrapped.forEach((ln,i)=>{
+            ctx.fillText(ln,node.x,node.y+8/scale+i*11/scale);
+          });
+        }
+    }
+
+    if(hasChildren(node.id)){
+      const btnX=node.x+NR*0.75,btnY=node.y-NR*0.75,btnR=10/scale;
+      const isColl=collapsedNodes.has(node.id);
+      ctx.beginPath();ctx.arc(btnX,btnY,btnR,0,Math.PI*2);
+      ctx.fillStyle=isColl?col:'rgba(17,19,24,0.92)';ctx.fill();
+      ctx.strokeStyle=col;ctx.lineWidth=1.5/scale;ctx.stroke();
+      ctx.fillStyle=isColl?'#0a0c10':col;
+      ctx.font='700 '+(10/scale)+'px monospace';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(isColl?'+':'−',btnX,btnY+(1/scale));
+    }
+  });
+  ctx.restore();
+}
 
 </script>
 </body>
