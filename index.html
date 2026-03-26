@@ -789,9 +789,16 @@ function chapterDepth(ch){
   if(parts.length<=2) return 0;
   return 1;
 }
+// 👇 이렇게 변경하세요
 function nodeColor(node){
-  const d=chapterDepth(node.id);
-  return d===0?'#4af0c4':'#1a9a7a';
+  // 1. 커스텀 추가 개념 (노란색)
+  if (!/^([A-Z]\.)?\d+(\.\d+)*$/.test(node.id)) return '#fbbf24'; 
+  
+  // 2. 공업수학 (알파벳으로 시작, 예: A.1) -> 연보라색
+  if (/^[A-Z]\./.test(node.id)) return '#818cf8'; 
+  
+  // 3. 반도체공학 (숫자로 시작, 예: 6.2.1) -> 기존 청록색
+  return '#4af0c4'; 
 }
 
 function redraw(){
@@ -817,12 +824,11 @@ function redraw(){
   });
 
   // 노드
-  nodes.forEach(node=>{
+    nodes.forEach(node=>{
     if(hiddenIds.has(node.id))return;
     const col=nodeColor(node);
     const isFocused=node.id===focusNodeId;
     const isHi=hasHi&&hiChapters.includes(node.id);
-
     // glow
     const g=ctx.createRadialGradient(node.x,node.y,NR*0.3,node.x,node.y,NR*1.7);
     g.addColorStop(0,col+(isFocused||isHi?'30':'15'));
